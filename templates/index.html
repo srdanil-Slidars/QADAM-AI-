@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Qadam AI — твой следующий шаг</title><link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}"><script defer src="{{ url_for('static',filename='app.js') }}"></script></head>
+<body>
+<aside class="sidebar">
+ <a class="brand" href="#dashboard"><span class="logo">q<span>↗</span></span><span>qadam<span class="brand-ai"> ai</span></span></a>
+ <div class="workspace"><span class="uni-icon">▥</span><div><strong id="universityLabel">Мой университет</strong><small>Пространство студента</small></div><span class="online"></span></div>
+ <div class="nav-label">МОЁ ПРОСТРАНСТВО</div>
+ <nav aria-label="Основная навигация">
+  <button data-page="dashboard" class="active"><span>◫</span>Обзор<span class="nav-dot"></span></button>
+  <button data-page="plan"><span>☷</span>Мой план</button>
+  <button data-page="chat"><span>✧</span>AI-помощник<span class="new">DEMO</span></button>
+  <button data-page="progress"><span>▥</span>Мой прогресс</button>
+  <button data-page="library"><span>▤</span>Полезные материалы</button>
+ </nav>
+ <div class="nav-label second">РЯДОМ С ТОБОЙ</div>
+ <nav><button data-page="support"><span>♡</span>Поддержка</button><button data-page="settings"><span>⚙</span>Настройки</button></nav>
+ <div class="sidebar-bottom"><div class="small-card"><span>✦ Маленькие шаги имеют значение</span><p>Не нужно успевать всё.<br>Начни с одного шага сегодня.</p></div><button id="themeToggle" class="theme-toggle">☾ <span>Тёмная тема</span><i></i></button><div class="profile"><div class="avatar" id="avatar">С</div><div><strong id="profileName">Студент</strong><small id="profileGroup">Первый курс</small></div><span class="online"></span></div></div>
+</aside>
+<main><header><button id="mobileMenu" aria-label="Открыть меню">☰</button><div class="breadcrumb">Моё пространство <span>/</span> <strong id="pageLabel">Обзор</strong></div><div class="header-right"><button id="profileButton" class="profile-button" aria-label="Открыть профиль" title="Мой профиль" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20v-2a6.5 6.5 0 0 1 13 0v2"/></svg></button><span id="todayLabel"></span></div></header><div id="content"></div><footer><span>Qadam AI · Твой следующий шаг</span><span>Создано с заботой о студентах <span class="heart">♡</span></span></footer></main>
+<div id="toast" role="status"></div>
+<dialog id="checkinDialog"><form id="checkinForm"><button type="button" class="close" aria-label="Закрыть">×</button><div class="eyebrow">ВРЕМЯ ДЛЯ СЕБЯ</div><h2>Как ты сегодня?</h2><p class="muted">Здесь нет правильных ответов. Отметь, как чувствуешь себя сейчас.</p><label>Настроение</label><div class="moods"> <button type="button" data-mood="1" aria-label="Очень плохо">😞</button><button type="button" data-mood="2" aria-label="Плохо">🙁</button><button type="button" data-mood="3" aria-label="Нейтрально">😐</button><button type="button" data-mood="4" aria-label="Хорошо">🙂</button><button type="button" data-mood="5" aria-label="Отлично">😄</button></div><label for="stress">Уровень стресса: <output id="stressValue">3</output> из 5</label><input id="stress" type="range" min="1" max="5" value="3"><div class="range-labels"><span>Спокойно</span><span>Сильное напряжение</span></div><label for="checkinNote">Хочешь чем-то поделиться?</label><textarea id="checkinNote" maxlength="2000" placeholder="Что повлияло на твой день? (необязательно)"></textarea><p class="fine">Запись хранится только в локальной базе на этом компьютере. Повторная отметка обновит запись за сегодня.</p><button class="primary full" type="submit">Сохранить мою отметку ↗</button></form></dialog>
+<dialog id="profileDialog" class="profile-dialog"><button type="button" class="close" data-close-profile aria-label="Закрыть профиль">×</button><div class="eyebrow">МОЁ ПРОСТРАНСТВО</div><h2>Мой профиль</h2><p class="muted">Немного о тебе, чтобы пространство стало своим.</p><div id="profileFields"></div></dialog>
+</body></html>
