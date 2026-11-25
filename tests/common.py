@@ -9,7 +9,7 @@ class DatabaseTestCase(unittest.TestCase):
         temp_root=Path(__file__).resolve().parents[1]/'tmp'
         temp_root.mkdir(exist_ok=True)
         self.temp=tempfile.TemporaryDirectory(dir=temp_root)
-        app.config.update(TESTING=True,DATABASE=str(Path(self.temp.name)/'test.sqlite3'))
+        app.config.update(TESTING=True,DATABASE=str(Path(self.temp.name)/'test.sqlite3'),AI_PROVIDER='topic')
         initialize()
         self.client=app.test_client()
 

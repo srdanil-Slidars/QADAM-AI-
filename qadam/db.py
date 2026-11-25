@@ -47,5 +47,20 @@ def initialize():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS login_attempts (key TEXT PRIMARY KEY, attempts INTEGER, reset_at REAL);
         CREATE TABLE IF NOT EXISTS campus_resources (id INTEGER PRIMARY KEY, group_id INTEGER NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS ai_actions (
+            id TEXT PRIMARY KEY, profile_id TEXT NOT NULL, user_id INTEGER,
+            kind TEXT NOT NULL, arguments TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+            expires_at REAL NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+        CREATE INDEX IF NOT EXISTS ai_actions_owner ON ai_actions(profile_id,status);
+        CREATE TABLE IF NOT EXISTS ai_audit (
+            id INTEGER PRIMARY KEY, profile_id TEXT NOT NULL, action_id TEXT NOT NULL,
+            kind TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+        CREATE INDEX IF NOT EXISTS messages_owner ON browser_messages(profile_id,id);
+        CREATE INDEX IF NOT EXISTS tasks_owner ON browser_tasks(profile_id,id);
+        CREATE INDEX IF NOT EXISTS support_owner ON browser_support(profile_id,id);
+        CREATE INDEX IF NOT EXISTS requests_student ON requests(student_id,id);
+        CREATE INDEX IF NOT EXISTS requests_curator ON requests(curator_id,id);
+        CREATE INDEX IF NOT EXISTS replies_request ON request_replies(request_id,id);
+        CREATE INDEX IF NOT EXISTS resources_group ON campus_resources(group_id,id);
         ''')
 

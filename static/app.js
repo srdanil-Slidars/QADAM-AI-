@@ -101,9 +101,9 @@ function plan() {
   return heading('Меньше в голове.<br>Больше ясности.','Запиши задачи и выбери, с чего начнёшь сегодня.','Мой план') + `<section class="panel"><div class="panel-title"><h2>Твои задачи</h2><span class="status">${state.tasks.filter(t=>!t.done).length} осталось</span></div><form id="taskForm" class="add-form"><input name="title" required maxlength="200" placeholder="Например, подготовить план доклада" aria-label="Новая задача"><button class="primary" type="submit">Добавить шаг</button></form>${tasksHTML()}${progressHTML()}</section>`;
 }
 function chat() {
-  return heading('Что у тебя на уме?','Здесь можно спокойно сформулировать то, что волнует.','AI-помощник') + `<div class="chat-layout"><div class="chat-notice">${icon('info')}<span>Встроенная TopicNet определяет тему запроса и подбирает ответ из базы знаний. Это экспериментальная специализированная модель, не универсальная языковая модель. Специалисты не отслеживают чат.</span></div>
-    <div id="messages" class="messages" role="log" aria-label="Переписка с помощником">${state.messages.length ? state.messages.map(m=>`<div class="message ${m.role === 'user'?'user':'assistant'}">${m.role==='assistant'?icon('spark','assistant-icon'):''}<div class="bubble">${esc(m.text)}</div></div>`).join('') : `<div class="empty chat-empty">${icon('spark')}<h2>Можно начать с малого</h2><p>Расскажи о ситуации или выбери тему ниже.<br>Сформулируем следующий шаг вместе.</p></div>`}</div>
-    <div class="chips"><button data-prompt="Помоги составить учебный план">Учебная нагрузка</button><button data-prompt="Мне тяжело справляться со стрессом">Моё состояние</button><button data-prompt="Мне сложно общаться с группой">Общение в группе</button></div>
+  return heading('Что у тебя на уме?','Здесь можно спокойно сформулировать то, что волнует.','AI-помощник') + `<div class="chat-layout"><div class="chat-notice">${icon('info')}<span>${state.ai?.cloud ? "Облачная языковая модель Google" : "Локальная языковая модель Qwen3"} ведёт диалог с учётом последних сообщений. Может ошибаться. Специалисты не отслеживают чат.</span></div>
+    ${state.ai?.cloud ? `<label class="consent"><input type="checkbox" id="cloudConsent" ${state.settings.ai_cloud_consent ? "checked" : ""}> Разрешаю передачу сообщений, последних реплик, задач и доступных материалов Google для ответа. Можно отозвать здесь.</label>` : ""}<div id="messages" class="messages" role="log" aria-label="Переписка с помощником">${state.messages.length ? state.messages.map(m=>`<div class="message ${m.role === 'user'?'user':'assistant'}">${m.role==='assistant'?icon('spark','assistant-icon'):''}<div class="bubble">${esc(m.text)}</div></div>`).join('') : `<div class="empty chat-empty">${icon('spark')}<h2>Можно начать с малого</h2><p>Расскажи о ситуации или выбери тему ниже.<br>Сформулируем следующий шаг вместе.</p></div>`}</div>
+    ${(state.ai_actions || []).map(a=>`<section class="panel ai-action"><h3>${esc(a.label)}</h3><p>Предложение — ожидает твоего подтверждения</p><pre>${esc(a.arguments.title || a.arguments.text || (a.arguments.task_id ? 'Задача №'+a.arguments.task_id : 'Обращение №'+a.arguments.request_id+' · '+({new:'Новое',in_progress:'В работе',resolved:'Решено'}[a.arguments.status] || '')))}</pre><button class="primary" data-ai-confirm="${esc(a.id)}">Подтвердить</button> <button class="text-button" data-ai-cancel="${esc(a.id)}">Отменить</button></section>`).join("")}<div class="chips"><button data-prompt="Помоги составить учебный план">Учебная нагрузка</button><button data-prompt="Мне тяжело справляться со стрессом">Моё состояние</button><button data-prompt="Мне сложно общаться с группой">Общение в группе</button></div>
     <form id="chatForm" class="chat-input"><textarea name="text" required maxlength="2000" placeholder="Расскажи, что тебя волнует…" aria-label="Сообщение помощнику"></textarea><button class="primary" type="submit">Отправить</button></form><p class="fine">Enter — отправить, Shift + Enter — новая строка. Чат не является экстренной помощью.</p></div>`;
 }
 function progress() {
@@ -250,7 +250,7 @@ function bindForms() {
       event.preventDefault();
       const text = chatForm.elements.namedItem('text').value.trim();
       if (!text) return;
-      submitForm(chatForm,async()=>{await api('chat','POST',{text});await refresh();$('#chatForm textarea').focus();});
+      submitForm(chatForm,async()=>{const send=chatForm.querySelector('button');send.textContent='Думаю…';try {await api('chat','POST',{text});await refresh();$('#chatForm textarea').focus();}finally {send.textContent='Отправить';}});
     };
     chatForm.elements.namedItem('text').onkeydown = event => {
       if (event.key==='Enter' && !event.shiftKey && !event.isComposing) {
@@ -289,6 +289,7 @@ document.addEventListener('click',async event=>{
     return;
   }
   try {
+    if (button.dataset.aiConfirm || button.dataset.aiCancel) {button.disabled=true;try {await api(`ai/actions/${button.dataset.aiConfirm || button.dataset.aiCancel}/${button.dataset.aiConfirm ? 'confirm' : 'cancel'}`,'POST',{});await refresh();}finally {button.disabled=false;}}
     if (button.dataset.auth) openAuth(button.dataset.auth);
     if (button.hasAttribute('data-logout')) {await api('auth/logout','POST',{});$('#profileDialog').close();await refresh();location.hash='home';toast('Ты вышел из аккаунта');}
     if (button.hasAttribute('data-leave-group')) {await api('membership','DELETE',{});await refresh();toast('Ты вышел из группы');}
@@ -312,6 +313,7 @@ document.addEventListener('click',async event=>{
   } catch (error) { toast(error.message); }
 });
 document.addEventListener('change',async event=>{
+  if (event.target.id==='cloudConsent') {try {await api('settings','POST',{ai_cloud_consent:event.target.checked});await refresh();}catch(error){event.target.checked=!event.target.checked;toast(error.message);}return;}
   if (event.target.id==='shareCheckins') {
     const control=event.target;control.disabled=true;
     try {await api('membership','PATCH',{share_checkins:control.checked});await refresh();toast('Настройка доступа сохранена');}

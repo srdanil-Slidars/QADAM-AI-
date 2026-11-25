@@ -7,7 +7,8 @@ from pathlib import Path
 from flask import Flask, g, jsonify, render_template, request
 from qadam.db import db, initialize as initialize_db
 from qadam.accounts import configure_accounts, public_user
-from qadam.assistant import respond
+from qadam.llm import respond, info as ai_info, AIUnavailable
+from qadam.llm_actions import actions, list_pending
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 65536
@@ -64,6 +65,8 @@ def state():
             result[table] = [dict(row) for row in c.execute(f'SELECT {columns} FROM browser_{table} WHERE profile_id=? ORDER BY id', (g.profile_id,))]
     from qadam.campus import membership_info
     result['membership'] = membership_info()
+    result['ai']=ai_info()
+    result['ai_actions']=list_pending(g.profile_id)
     return jsonify(result)
 
 @app.post('/api/settings')
@@ -74,6 +77,7 @@ def settings():
         for key in ('name','university','group','theme','faculty','specialty','course','phone','email'):
             if key in data and isinstance(data[key], str):
                 current[key] = data[key].strip()[:100]
+        if type(data.get('ai_cloud_consent')) is bool:current['ai_cloud_consent']=data['ai_cloud_consent']
         if current['theme'] not in ('light','dark'): current['theme']='light'
         c.execute('UPDATE browser_profiles SET data=? WHERE id=?', (json.dumps(current, ensure_ascii=False),g.profile_id))
     return jsonify(ok=True)
@@ -109,6 +113,8 @@ def chat():
     if not text or len(text)>2000: return jsonify(error='Сообщение должно содержать от 1 до 2000 символов.'),400
     try:
         result=respond(text,g.profile_id,g.user)
+    except AIUnavailable as error:
+        return jsonify(error=str(error)),503
     except (OSError,ValueError,KeyError):
         app.logger.exception('Integrated assistant could not load its model or knowledge')
         return jsonify(error='Помощник временно недоступен. Попробуй позже.'),503
@@ -130,7 +136,9 @@ def support():
 
 from qadam.campus import campus
 app.register_blueprint(campus)
+app.register_blueprint(actions)
 
 initialize()
 if __name__ == '__main__':
-    app.run(host='127.0.0.1',port=5000,debug=False)
+    from qadam.local_runtime import run_with_model
+    run_with_model(app)
