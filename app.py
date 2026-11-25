@@ -2,47 +2,33 @@
 import json
 import os
 import secrets
-import sqlite3
-from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from flask import Flask, g, jsonify, render_template, request
+from qadam.db import db, initialize as initialize_db
+from qadam.accounts import configure_accounts, public_user
+from qadam.assistant import respond
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 65536
 app.config['DATABASE'] = os.environ.get('QADAM_DATABASE', str(Path(__file__).with_name('qadam.sqlite3')))
 
-@contextmanager
-def db():
-    connection = sqlite3.connect(app.config['DATABASE'])
-    connection.row_factory = sqlite3.Row
-    try:
-        with connection:
-            yield connection
-    finally:
-        connection.close()
+configure_accounts(app)
 
 def initialize():
-    with db() as c:
-        # Keep the former shared tables untouched. Their owner is unknown,
-        # so no browser may inherit their personal information.
-        c.executescript('''
-        CREATE TABLE IF NOT EXISTS browser_profiles (id TEXT PRIMARY KEY, data TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS browser_checkins (id INTEGER PRIMARY KEY, profile_id TEXT NOT NULL, day TEXT NOT NULL, mood INTEGER, stress INTEGER, note TEXT, UNIQUE(profile_id, day));
-        CREATE TABLE IF NOT EXISTS browser_tasks (id INTEGER PRIMARY KEY, profile_id TEXT NOT NULL, title TEXT NOT NULL, category TEXT, done INTEGER DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS browser_messages (id INTEGER PRIMARY KEY, profile_id TEXT NOT NULL, role TEXT, text TEXT);
-        CREATE TABLE IF NOT EXISTS browser_support (id INTEGER PRIMARY KEY, profile_id TEXT NOT NULL, day TEXT, text TEXT);
-        CREATE INDEX IF NOT EXISTS browser_tasks_owner ON browser_tasks(profile_id);
-        CREATE INDEX IF NOT EXISTS browser_messages_owner ON browser_messages(profile_id);
-        CREATE INDEX IF NOT EXISTS browser_support_owner ON browser_support(profile_id);
-        ''')
+    with app.app_context():
+        initialize_db()
 
 @app.before_request
 def identify_browser():
     if not request.path.startswith('/api/'):
         return
+    if g.user is not None:
+        g.profile_id = g.user['profile_id']
+        return
     token = request.cookies.get('qadam_browser', '')
     with db() as c:
-        existing = c.execute('SELECT id FROM browser_profiles WHERE id=?', (token,)).fetchone() if len(token) == 64 else None
+        existing = c.execute('SELECT p.id FROM browser_profiles p LEFT JOIN users u ON u.profile_id=p.id WHERE p.id=? AND u.id IS NULL', (token,)).fetchone() if len(token) == 64 else None
         if existing:
             g.profile_id = existing['id']
             return
@@ -61,7 +47,7 @@ def protect_browser_data(response):
         response.headers['Cache-Control'] = 'private, no-store'
         if getattr(g, 'new_profile', False):
             response.set_cookie('qadam_browser', g.profile_id, max_age=365*24*60*60,
-                                httponly=True, secure=request.is_secure, samesite='Lax')
+                                httponly=True, secure=request.is_secure or app.config['SESSION_COOKIE_SECURE'], samesite='Lax')
     return response
 
 @app.get('/')
@@ -71,11 +57,13 @@ def index():
 @app.get('/api/state')
 def state():
     with db() as c:
-        result = {'settings':json.loads(c.execute('SELECT data FROM browser_profiles WHERE id=?', (g.profile_id,)).fetchone()[0])}
+        result = {'settings':json.loads(c.execute('SELECT data FROM browser_profiles WHERE id=?', (g.profile_id,)).fetchone()[0]), 'today':date.today().isoformat(), 'user':public_user(g.user)}
         fields = {'checkins':'id,day,mood,stress,note', 'tasks':'id,title,category,done',
                   'messages':'id,role,text', 'support':'id,day,text'}
         for table, columns in fields.items():
             result[table] = [dict(row) for row in c.execute(f'SELECT {columns} FROM browser_{table} WHERE profile_id=? ORDER BY id', (g.profile_id,))]
+    from qadam.campus import membership_info
+    result['membership'] = membership_info()
     return jsonify(result)
 
 @app.post('/api/settings')
@@ -115,25 +103,21 @@ def toggle_task(task_id):
         cursor=c.execute('UPDATE browser_tasks SET done=1-done WHERE id=? AND profile_id=?',(task_id,g.profile_id))
     return (jsonify(ok=True),200) if cursor.rowcount else (jsonify(error='Задача не найдена'),404)
 
-def demo_reply(text):
-    t=text.lower()
-    if any(word in t for word in ('суицид','убить себя','самоубий','навредить себе')):
-        return 'Спасибо, что рассказал об этом. Сейчас важнее всего твоя безопасность. Если есть непосредственная опасность, обратись в местную экстренную службу или ближайшее отделение неотложной помощи. По возможности свяжись с человеком, которому доверяешь, и попроси его побыть рядом. Этот демонстрационный чат не отслеживается специалистами. Ты можешь также открыть раздел «Поддержка».'
-    if any(word in t for word in ('стресс','устал','тревог','тяжело','пережива')):
-        return 'Похоже, сейчас на тебя многое навалилось. Попробуй выбрать одну небольшую задачу, которую реально выполнить сегодня, и запланировать перерыв. Что сейчас беспокоит больше всего: учёба, общение или что-то другое? Если трудности сохраняются, стоит обсудить их с психологом или куратором.'
-    if any(word in t for word in ('друг','одинок','общен','групп','познаком')):
-        return 'Начать общение бывает непросто. Небольшой шаг на сегодня: спросить одногруппника о ближайшем задании или предложить вместе подготовиться к паре. Не обязательно сразу знакомиться со всеми. Какой формат общения тебе комфортнее?'
-    if any(word in t for word in ('учеб','учёб','дедлайн','задан','экзамен','план','успева')):
-        return 'Давай разложим нагрузку на шаги: выпиши ближайшие сроки, выбери самое срочное задание и выдели на первый этап 25 минут. Добавь этот шаг в «Мой план». Какие задания и сроки у тебя сейчас?'
-    return 'Давай начнём с того, что сейчас важнее всего для тебя: учебная нагрузка, самочувствие или общение? Опиши конкретную ситуацию. В этом прототипе я отвечаю по демонстрационным сценариям; обученная нейросеть пока не подключена.'
-
 @app.post('/api/chat')
 def chat():
     text=str((request.get_json(silent=True) or {}).get('text','')).strip()
     if not text or len(text)>2000: return jsonify(error='Сообщение должно содержать от 1 до 2000 символов.'),400
-    reply=demo_reply(text)
+    try:
+        result=respond(text,g.profile_id,g.user)
+    except (OSError,ValueError,KeyError):
+        app.logger.exception('Integrated assistant could not load its model or knowledge')
+        return jsonify(error='Помощник временно недоступен. Попробуй позже.'),503
+    reply=result['reply']
+    if result.get('sources'):
+        reply+='\n\nОснова ответа: '+', '.join(item['title'] for item in result['sources'])
+        result['reply']=reply
     with db() as c: c.executemany('INSERT INTO browser_messages (profile_id,role,text) VALUES (?,?,?)',[(g.profile_id,'user',text),(g.profile_id,'assistant',reply)])
-    return jsonify(reply=reply)
+    return jsonify(result)
 
 @app.post('/api/support')
 def support():
@@ -143,6 +127,9 @@ def support():
     if not text or len(text)>2000: return jsonify(error='Опишите обращение: до 2000 символов.'),400
     with db() as c: c.execute('INSERT INTO browser_support (profile_id,day,text) VALUES (?,?,?)',(g.profile_id,date.today().isoformat(),text))
     return jsonify(ok=True)
+
+from qadam.campus import campus
+app.register_blueprint(campus)
 
 initialize()
 if __name__ == '__main__':

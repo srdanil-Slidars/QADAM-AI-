@@ -1,24 +1,12 @@
-import tempfile
 import json
 import sqlite3
 from contextlib import closing
 import unittest
-from pathlib import Path
 from app import app, initialize
+from tests.common import DatabaseTestCase
 
 
-class AppTests(unittest.TestCase):
-    def setUp(self):
-        temp_root = Path(__file__).resolve().parents[1] / 'tmp'
-        temp_root.mkdir(exist_ok=True)
-        self.temp = tempfile.TemporaryDirectory(dir=temp_root)
-        app.config.update(TESTING=True, DATABASE=str(Path(self.temp.name) / 'test.sqlite3'))
-        initialize()
-        self.client = app.test_client()
-
-    def tearDown(self):
-        self.temp.cleanup()
-
+class AppTests(DatabaseTestCase):
     def test_daily_checkin_updates_instead_of_duplicates(self):
         self.assertEqual(self.client.post('/api/checkins', json={'mood':0,'stress':3}).status_code,400)
         for mood in (3,5):
@@ -30,7 +18,7 @@ class AppTests(unittest.TestCase):
     def test_task_and_settings_persist(self):
         self.client.post('/api/tasks',json={'title':'Подготовить доклад'})
         task=self.client.get('/api/state').json['tasks'][-1]
-        self.client.patch(f"/api/tasks/{task['id']}")
+        self.client.patch(f"/api/tasks/{task['id']}",json={})
         self.client.post('/api/settings',json={'name':'Данил','theme':'dark','faculty':'Информатика','phone':'+7 000 000 00 00','course':'1','specialty':'Программирование','email':'demo@example.com'})
         state=self.client.get('/api/state').json
         self.assertEqual(state['tasks'][-1]['done'],1)
@@ -41,7 +29,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(state['settings']['specialty'],'Программирование')
         self.assertEqual(state['settings']['course'],'1')
         self.assertEqual(state['settings']['email'],'demo@example.com')
-        self.assertEqual(self.client.patch('/api/tasks/99999').status_code,404)
+        self.assertEqual(self.client.patch('/api/tasks/99999',json={}).status_code,404)
 
     def test_chat_and_support_are_explicitly_local(self):
         response=self.client.post('/api/chat',json={'text':'Не успеваю выполнять задания'})
@@ -67,7 +55,7 @@ class AppTests(unittest.TestCase):
         for key in ('checkins','messages','support'):
             self.assertEqual(separate[key],[])
         self.assertEqual(len(separate['tasks']),3)
-        self.assertEqual(other.patch(f"/api/tasks/{own['tasks'][-1]['id']}",base_url='https://localhost').status_code,404)
+        self.assertEqual(other.patch(f"/api/tasks/{own['tasks'][-1]['id']}",base_url='https://localhost',json={}).status_code,404)
         self.assertEqual(self.client.get('/api/state').json['tasks'][-1]['done'],0)
         other.post('/api/checkins',json={'mood':5,'stress':1},base_url='https://localhost')
         self.assertEqual(self.client.get('/api/state').json['checkins'][0]['mood'],2)

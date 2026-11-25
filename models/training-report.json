@@ -1,0 +1,112 @@
+{
+  "training_examples": 80,
+  "validation_examples": 20,
+  "validation_correct": 13,
+  "validation_accuracy": 0.65,
+  "provenance": "Synthetic examples authored for Qadam AI, not clinical or expert-validated data. No real student messages.",
+  "seed": 2026,
+  "epochs": 140,
+  "limits": "Small synthetic validation split. Not clinical validation or a measure of real-world safety.",
+  "results": [
+    {
+      "text": "Как подготовиться к зачёту",
+      "expected": "study",
+      "predicted": "support"
+    },
+    {
+      "text": "Как разбить курсовую работу на этапы",
+      "expected": "study",
+      "predicted": "support"
+    },
+    {
+      "text": "Нужно распределить время на учёбу",
+      "expected": "study",
+      "predicted": "wellbeing"
+    },
+    {
+      "text": "Как совместить пары и подготовку к семинарам",
+      "expected": "study",
+      "predicted": "study"
+    },
+    {
+      "text": "Трудно найти общий язык с соседями по общежитию",
+      "expected": "social",
+      "predicted": "social"
+    },
+    {
+      "text": "Как познакомиться с ребятами на первом курсе",
+      "expected": "social",
+      "predicted": "social"
+    },
+    {
+      "text": "Не получается подружиться с однокурсниками",
+      "expected": "social",
+      "predicted": "social"
+    },
+    {
+      "text": "Мне не с кем обсудить занятия",
+      "expected": "social",
+      "predicted": "study"
+    },
+    {
+      "text": "Как позаботиться о себе в сложный день",
+      "expected": "wellbeing",
+      "predicted": "wellbeing"
+    },
+    {
+      "text": "Не хватает сил и хочется выдохнуть",
+      "expected": "wellbeing",
+      "predicted": "wellbeing"
+    },
+    {
+      "text": "Хочу понять что влияет на настроение",
+      "expected": "wellbeing",
+      "predicted": "support"
+    },
+    {
+      "text": "Переживаю из-за перемен",
+      "expected": "wellbeing",
+      "predicted": "wellbeing"
+    },
+    {
+      "text": "Как связаться с ответственным за группу",
+      "expected": "support",
+      "predicted": "social"
+    },
+    {
+      "text": "Можно ли попросить встречи с психологом",
+      "expected": "support",
+      "predicted": "support"
+    },
+    {
+      "text": "Мне нужна помощь специалиста",
+      "expected": "support",
+      "predicted": "support"
+    },
+    {
+      "text": "Где найти поддержку в университете",
+      "expected": "support",
+      "predicted": "social"
+    },
+    {
+      "text": "Какие возможности у приложения",
+      "expected": "general",
+      "predicted": "general"
+    },
+    {
+      "text": "Что ты умеешь",
+      "expected": "general",
+      "predicted": "general"
+    },
+    {
+      "text": "Что такое Qadam AI",
+      "expected": "general",
+      "predicted": "general"
+    },
+    {
+      "text": "Как пользоваться этим приложением",
+      "expected": "general",
+      "predicted": "general"
+    }
+  ]
+}

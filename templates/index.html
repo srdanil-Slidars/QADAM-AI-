@@ -1,24 +1,42 @@
 <!doctype html>
 <html lang="ru" data-theme="light">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Qadam AI — твой следующий шаг</title><link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}"><script defer src="{{ url_for('static',filename='app.js',v='20261120-profile') }}"></script></head>
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#7442e8"><meta name="description" content="Qadam AI — пространство поддержки первокурсников. Учебный план, самочувствие и следующий шаг в своём темпе.">
+  <title>Qadam AI — в своём темпе</title>
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('qadam-theme')==='dark'?'dark':'light'}catch(e){}</script>
+  <link rel="icon" href="{{ url_for('static', filename='assets/mark.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261125') }}">
+  <script defer src="{{ url_for('static', filename='app.js', v='20261125') }}"></script>
+</head>
 <body>
-<aside class="sidebar">
- <a class="brand" href="#dashboard"><span class="logo">q<span>↗</span></span><span>qadam<span class="brand-ai"> ai</span></span></a>
- <div class="workspace"><span class="uni-icon">▥</span><div><strong id="universityLabel">Мой университет</strong><small>Пространство студента</small></div><span class="online"></span></div>
- <div class="nav-label">МОЁ ПРОСТРАНСТВО</div>
- <nav aria-label="Основная навигация">
-  <button data-page="dashboard" class="active"><span>◫</span>Обзор<span class="nav-dot"></span></button>
-  <button data-page="plan"><span>☷</span>Мой план</button>
-  <button data-page="chat"><span>✧</span>AI-помощник<span class="new">DEMO</span></button>
-  <button data-page="progress"><span>▥</span>Мой прогресс</button>
-  <button data-page="library"><span>▤</span>Полезные материалы</button>
- </nav>
- <div class="nav-label second">РЯДОМ С ТОБОЙ</div>
- <nav><button data-page="support"><span>♡</span>Поддержка</button><button data-page="settings"><span>⚙</span>Настройки</button></nav>
- <div class="sidebar-bottom"><div class="small-card"><span>✦ Маленькие шаги имеют значение</span><p>Не нужно успевать всё.<br>Начни с одного шага сегодня.</p></div><button id="themeToggle" class="theme-toggle">☾ <span>Тёмная тема</span><i></i></button><div class="profile"><div class="avatar" id="avatar">С</div><div><strong id="profileName">Студент</strong><small id="profileGroup">Первый курс</small></div><span class="online"></span></div></div>
-</aside>
-<main><header><button id="mobileMenu" aria-label="Открыть меню">☰</button><div class="breadcrumb">Моё пространство <span>/</span> <strong id="pageLabel">Обзор</strong></div><div class="header-right"><button id="profileButton" class="profile-button" aria-label="Открыть профиль" title="Мой профиль" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20v-2a6.5 6.5 0 0 1 13 0v2"/></svg></button><span id="todayLabel"></span></div></header><div id="content"></div><footer><span>Qadam AI · Твой следующий шаг</span><span>Создано с заботой о студентах <span class="heart">♡</span></span></footer></main>
-<div id="toast" role="status"></div>
-<dialog id="checkinDialog"><form id="checkinForm"><button type="button" class="close" aria-label="Закрыть">×</button><div class="eyebrow">ВРЕМЯ ДЛЯ СЕБЯ</div><h2>Как ты сегодня?</h2><p class="muted">Здесь нет правильных ответов. Отметь, как чувствуешь себя сейчас.</p><label>Настроение</label><div class="moods"> <button type="button" data-mood="1" aria-label="Очень плохо">😞</button><button type="button" data-mood="2" aria-label="Плохо">🙁</button><button type="button" data-mood="3" aria-label="Нейтрально">😐</button><button type="button" data-mood="4" aria-label="Хорошо">🙂</button><button type="button" data-mood="5" aria-label="Отлично">😄</button></div><label for="stress">Уровень стресса: <output id="stressValue">3</output> из 5</label><input id="stress" type="range" min="1" max="5" value="3"><div class="range-labels"><span>Спокойно</span><span>Сильное напряжение</span></div><label for="checkinNote">Хочешь чем-то поделиться?</label><textarea id="checkinNote" maxlength="2000" placeholder="Что повлияло на твой день? (необязательно)"></textarea><p class="fine">Запись сохраняется в профиле этого браузера. Повторная отметка обновит запись за сегодня.</p><button class="primary full" type="submit">Сохранить мою отметку ↗</button></form></dialog>
-<dialog id="profileDialog" class="profile-dialog"><button type="button" class="close" data-close-profile aria-label="Закрыть профиль">×</button><div class="eyebrow">МОЁ ПРОСТРАНСТВО</div><h2>Мой профиль</h2><p class="muted">Немного о тебе, чтобы пространство стало своим.</p><div id="profileFields"></div></dialog>
-</body></html>
+  <a class="skip-link" href="#content">Перейти к содержимому</a>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href="#home" aria-label="Qadam AI — главная"><img src="{{ url_for('static', filename='assets/mark.svg') }}" alt="" width="38" height="38"><span>qadam<span class="brand-ai"> ai</span></span></a>
+    <nav id="mainNav" class="main-nav" aria-label="Основная навигация">
+      <a href="#home" data-page="home">Главная</a><a href="#dashboard" data-page="dashboard">Мой день</a><a href="#plan" data-page="plan">План</a><a href="#chat" data-page="chat">AI-помощник</a>
+      <details class="more-nav" id="moreNav"><summary>Ещё <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="nav-dropdown"><a href="#progress" data-page="progress">Мой прогресс</a><a href="#library" data-page="library">Материалы</a><a href="#support" data-page="support">Поддержка</a><a href="#curator" data-page="curator" id="curatorNav" hidden>Кабинет куратора</a></div></details>
+    </nav>
+    <div class="header-tools">
+      <button id="themeToggle" class="icon-button" type="button" aria-label="Включить тёмную тему" title="Тёмная тема"></button>
+      <button id="profileButton" class="profile-button" type="button" aria-label="Открыть профиль" title="Мой профиль" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20v-2a6.5 6.5 0 0 1 13 0v2"/></svg></button>
+      <button id="mobileMenu" class="icon-button mobile-menu" type="button" aria-label="Открыть меню" aria-controls="mainNav" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </div></header>
+  <main id="content" tabindex="-1"><div class="loading-screen" role="status"><span class="loading-mark">q</span><p>Готовим твоё пространство…</p></div></main>
+  <footer class="site-footer"><a class="footer-brand" href="#home">qadam ai</a><span>Поддержка на твоём пути</span><a href="#support">Помощь и поддержка</a></footer>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="checkinDialog" aria-labelledby="checkinTitle"><form id="checkinForm">
+    <button type="button" class="close icon-button" data-close="checkinDialog" aria-label="Закрыть опрос">×</button>
+    <div class="eyebrow">Небольшая пауза для себя</div><h2 id="checkinTitle">Как ты сегодня?</h2><p class="muted">Отметь, как чувствуешь себя сейчас. Здесь нет правильных ответов.</p>
+    <fieldset class="mood-field"><legend>Настроение</legend><div class="moods">
+      <button type="button" data-mood="1" aria-label="Очень плохо" aria-pressed="false"><span aria-hidden="true">😞</span><small>Тяжело</small></button><button type="button" data-mood="2" aria-label="Плохо" aria-pressed="false"><span aria-hidden="true">🙁</span><small>Не очень</small></button><button type="button" data-mood="3" aria-label="Нейтрально" aria-pressed="false"><span aria-hidden="true">😐</span><small>Ровно</small></button><button type="button" data-mood="4" aria-label="Хорошо" aria-pressed="false"><span aria-hidden="true">🙂</span><small>Хорошо</small></button><button type="button" data-mood="5" aria-label="Отлично" aria-pressed="false"><span aria-hidden="true">😄</span><small>Отлично</small></button>
+    </div></fieldset>
+    <label for="stress">Уровень стресса <output id="stressValue">3</output> / 5</label><input id="stress" type="range" min="1" max="5" value="3"><div class="range-labels"><span>Спокойно</span><span>Сильное напряжение</span></div>
+    <label for="checkinNote">Что повлияло на твой день? <span class="optional">Необязательно</span></label><textarea id="checkinNote" maxlength="2000" placeholder="Можно написать пару слов"></textarea>
+    <p class="fine">Повторная отметка обновит запись за сегодня. Она привязана к профилю этого браузера.</p><button class="primary full" type="submit">Сохранить отметку</button>
+  </form></dialog>
+  <dialog id="profileDialog" class="profile-dialog" aria-labelledby="profileTitle"><button type="button" class="close icon-button" data-close="profileDialog" aria-label="Закрыть профиль">×</button><div class="eyebrow">Личное пространство</div><h2 id="profileTitle">Твой профиль</h2><p class="muted">Расскажи немного о себе и своём университете.</p><div id="profileFields"></div></dialog>
+  <dialog id="authDialog" aria-labelledby="authTitle"><button type="button" class="close icon-button" data-close="authDialog" aria-label="Закрыть вход">×</button><div id="authFields"></div></dialog>
+</body>
+</html>
