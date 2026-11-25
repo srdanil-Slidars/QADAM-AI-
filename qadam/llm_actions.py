@@ -79,7 +79,12 @@ def confirm(action_id):
         elif kind=='set_request_status':c.execute('UPDATE requests SET status=? WHERE id=? AND curator_id=?',(args['status'],args['request_id'],g.user['id']))
         c.execute("UPDATE ai_actions SET status='executed' WHERE id=?",(action_id,))
         c.execute('INSERT INTO ai_audit(profile_id,action_id,kind) VALUES (?,?,?)',(g.profile_id,action_id,kind))
-        c.execute('INSERT INTO browser_messages(profile_id,role,text) VALUES (?,?,?)',(g.profile_id,'assistant','Подтверждённое действие выполнено: '+LABELS[kind]+'.'))
+        language=json.loads(c.execute('SELECT data FROM browser_profiles WHERE id=?',(g.profile_id,)).fetchone()[0]).get('language','ru')
+        labels={
+            'en':{'add_task':'add to plan','complete_task':'complete task','save_draft':'save draft','send_request':'send to curator','reply_request':'send reply','set_request_status':'change status'},
+            'kk':{'add_task':'жоспарға қосу','complete_task':'тапсырманы аяқтау','save_draft':'жобаны сақтау','send_request':'кураторға жіберу','reply_request':'жауап жіберу','set_request_status':'күйін өзгерту'}}
+        message=({'en':'Confirmed action completed: ','kk':'Расталған әрекет орындалды: '}.get(language,'Подтверждённое действие выполнено: ')+labels.get(language,LABELS)[kind]+'.')
+        c.execute('INSERT INTO browser_messages(profile_id,role,text) VALUES (?,?,?)',(g.profile_id,'assistant',message))
     return jsonify(ok=True)
 
 @actions.post('/<action_id>/cancel')

@@ -35,7 +35,7 @@ def identify_browser():
             return
         g.profile_id = secrets.token_hex(32)
         g.new_profile = True
-        defaults = {'name':'','university':'','group':'','theme':'light'}
+        defaults = {'name':'','university':'','group':'','theme':'light','language':'ru'}
         c.execute('INSERT INTO browser_profiles VALUES (?, ?)', (g.profile_id, json.dumps(defaults)))
         c.executemany('INSERT INTO browser_tasks (profile_id,title,category) VALUES (?,?,?)', [
             (g.profile_id,'Составить план на учебную неделю','Учёба'),
@@ -78,6 +78,7 @@ def settings():
             if key in data and isinstance(data[key], str):
                 current[key] = data[key].strip()[:100]
         if type(data.get('ai_cloud_consent')) is bool:current['ai_cloud_consent']=data['ai_cloud_consent']
+        if data.get('language') in ('ru','kk','en'):current['language']=data['language']
         if current['theme'] not in ('light','dark'): current['theme']='light'
         c.execute('UPDATE browser_profiles SET data=? WHERE id=?', (json.dumps(current, ensure_ascii=False),g.profile_id))
     return jsonify(ok=True)
@@ -112,7 +113,7 @@ def chat():
     text=str((request.get_json(silent=True) or {}).get('text','')).strip()
     if not text or len(text)>2000: return jsonify(error='Сообщение должно содержать от 1 до 2000 символов.'),400
     try:
-        result=respond(text,g.profile_id,g.user)
+        result=respond(text,g.profile_id,g.user,language=(request.get_json(silent=True) or {}).get('language'))
     except AIUnavailable as error:
         return jsonify(error=str(error)),503
     except (OSError,ValueError,KeyError):

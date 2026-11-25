@@ -6,8 +6,9 @@
   <title>Qadam AI — в своём темпе</title>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('qadam-theme')==='dark'?'dark':'light'}catch(e){}</script>
   <link rel="icon" href="{{ url_for('static', filename='assets/mark.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261125') }}">
-  <script defer src="{{ url_for('static', filename='app.js', v='20261125') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261125-languages') }}">
+  <script defer src="{{ url_for('static', filename='i18n.js', v='20261125-languages') }}"></script>
+  <script defer src="{{ url_for('static', filename='app.js', v='20261125-languages') }}"></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Перейти к содержимому</a>
@@ -18,6 +19,7 @@
       <details class="more-nav" id="moreNav"><summary>Ещё <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="nav-dropdown"><a href="#progress" data-page="progress">Мой прогресс</a><a href="#library" data-page="library">Материалы</a><a href="#support" data-page="support">Поддержка</a><a href="#curator" data-page="curator" id="curatorNav" hidden>Кабинет куратора</a></div></details>
     </nav>
     <div class="header-tools">
+      <select id="languageSelect" class="language-select" aria-label="Язык интерфейса"><option value="ru" lang="ru">RU</option><option value="kk" lang="kk">ҚАЗ</option><option value="en" lang="en">EN</option></select>
       <button id="themeToggle" class="icon-button" type="button" aria-label="Включить тёмную тему" title="Тёмная тема"></button>
       <button id="profileButton" class="profile-button" type="button" aria-label="Открыть профиль" title="Мой профиль" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20v-2a6.5 6.5 0 0 1 13 0v2"/></svg></button>
       <button id="mobileMenu" class="icon-button mobile-menu" type="button" aria-label="Открыть меню" aria-controls="mainNav" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -26,7 +28,7 @@
   <main id="content" tabindex="-1"><div class="loading-screen" role="status"><span class="loading-mark">q</span><p>Готовим твоё пространство…</p></div></main>
   <footer class="site-footer"><a class="footer-brand" href="#home">qadam ai</a><span>Поддержка на твоём пути</span><a href="#support">Помощь и поддержка</a></footer>
   <div id="toast" role="status" aria-live="polite"></div>
-  <dialog id="checkinDialog" aria-labelledby="checkinTitle"><form id="checkinForm">
+  <dialog id="checkinDialog" closedby="none" aria-labelledby="checkinTitle"><form id="checkinForm">
     <button type="button" class="close icon-button" data-close="checkinDialog" aria-label="Закрыть опрос">×</button>
     <div class="eyebrow">Небольшая пауза для себя</div><h2 id="checkinTitle">Как ты сегодня?</h2><p class="muted">Отметь, как чувствуешь себя сейчас. Здесь нет правильных ответов.</p>
     <fieldset class="mood-field"><legend>Настроение</legend><div class="moods">
@@ -36,7 +38,7 @@
     <label for="checkinNote">Что повлияло на твой день? <span class="optional">Необязательно</span></label><textarea id="checkinNote" maxlength="2000" placeholder="Можно написать пару слов"></textarea>
     <p class="fine">Повторная отметка обновит запись за сегодня. Она привязана к профилю этого браузера.</p><button class="primary full" type="submit">Сохранить отметку</button>
   </form></dialog>
-  <dialog id="profileDialog" class="profile-dialog" aria-labelledby="profileTitle"><button type="button" class="close icon-button" data-close="profileDialog" aria-label="Закрыть профиль">×</button><div class="eyebrow">Личное пространство</div><h2 id="profileTitle">Твой профиль</h2><p class="muted">Расскажи немного о себе и своём университете.</p><div id="profileFields"></div></dialog>
-  <dialog id="authDialog" aria-labelledby="authTitle"><button type="button" class="close icon-button" data-close="authDialog" aria-label="Закрыть вход">×</button><div id="authFields"></div></dialog>
+  <dialog id="profileDialog" closedby="none" class="profile-dialog" aria-labelledby="profileTitle"><button type="button" class="close icon-button" data-close="profileDialog" aria-label="Закрыть профиль">×</button><div class="eyebrow">Личное пространство</div><h2 id="profileTitle">Твой профиль</h2><p class="muted">Расскажи немного о себе и своём университете.</p><div id="profileFields"></div></dialog>
+  <dialog id="authDialog" closedby="none" aria-labelledby="authTitle"><button type="button" class="close icon-button" data-close="authDialog" aria-label="Закрыть вход">×</button><div id="authFields"></div></dialog>
 </body>
 </html>

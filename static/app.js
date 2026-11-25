@@ -3,9 +3,14 @@
 let state = null;
 let page = 'home';
 let chosenMood = 0;
+let checkinDraftDay = null;
+const authDrafts = new Map();
+let authMode = null;
+const preserveText = value => `<span data-no-i18n>${esc(value)}</span>`;
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const titles = {home:'Главная',dashboard:'Мой день',plan:'Мой план',chat:'AI-помощник',progress:'Мой прогресс',library:'Материалы',support:'Поддержка',settings:'Профиль',curator:'Кабинет куратора'};
+const starterTasks = new Set(['Учёба:Составить план на учебную неделю','Общение:Познакомиться с одним одногруппником','Самочувствие:Выделить 20 минут на отдых']);
 const iconPaths = {
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
   moon:'<path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/>',
@@ -27,11 +32,11 @@ const articles = [
 async function api(url, method='GET', data) {
   const response = await fetch(`/api/${url}`, {method, headers:{'Content-Type':'application/json'}, ...(method !== 'GET' ? {body:JSON.stringify(data ?? {})} : {})});
   const result = await response.json();
-  if (!response.ok) throw Error(result.error || 'Не удалось выполнить действие');
+  if (!response.ok) throw Error(t(result.error || 'Не удалось выполнить действие'));
   return result;
 }
 function toast(message) {
-  $('#toast').textContent = message;
+  $('#toast').textContent = t(message);
   $('#toast').classList.add('visible');
   clearTimeout(window.toastTimer);
   window.toastTimer = setTimeout(() => $('#toast').classList.remove('visible'), 4500);
@@ -41,11 +46,16 @@ function applyTheme(theme) {
   try { localStorage.setItem('qadam-theme', theme); } catch (_) {}
   const toggle = $('#themeToggle');
   toggle.innerHTML = icon(theme === 'dark' ? 'sun' : 'moon');
-  toggle.title = toggle.ariaLabel = theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
+  toggle.title = toggle.ariaLabel = t(theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему');
   toggle.setAttribute('aria-pressed', String(theme === 'dark'));
 }
 async function refresh() {
   state = await api('state');
+  if (!QadamI18n.hasPreference) QadamI18n.set(state.settings.language || 'ru',false);
+  else if (state.settings.language!==QadamI18n.language) {
+    await api('settings','POST',{language:QadamI18n.language});
+    state.settings.language=QadamI18n.language;
+  }
   const [requests, campus] = await Promise.all([state.user ? api('requests') : Promise.resolve({requests:[]}), state.user?.role==='curator' ? api('curator') : Promise.resolve(null)]);
   state.requests=requests.requests;state.campus=campus;
   $('#curatorNav').hidden=state.user?.role!=='curator';
@@ -53,11 +63,11 @@ async function refresh() {
   render();
 }
 function heading(title, subtitle, eyebrow='Твоё пространство') {
-  return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1 tabindex="-1">${title}</h1><p>${subtitle}</p></div><span class="heading-meta">${new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}</span></div>`;
+  return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1 tabindex="-1">${title}</h1><p>${subtitle}</p></div><span class="heading-meta">${new Date().toLocaleDateString(QadamI18n.locale,{day:'numeric',month:'long'})}</span></div>`;
 }
 function tasksHTML(limit) {
   const tasks = limit ? [...state.tasks.filter(t=>!t.done), ...state.tasks.filter(t=>t.done)].slice(0,limit) : state.tasks;
-  return tasks.map(t => `<label class="task ${t.done?'done':''}"><input class="task-check" type="checkbox" data-task="${t.id}" ${t.done?'checked':''} aria-label="${t.done?'Вернуть в план':'Выполнить'}: ${esc(t.title)}"><span class="task-body"><span class="task-title">${esc(t.title)}</span><span class="task-tag">${esc(t.category)}</span></span></label>`).join('') || '<div class="empty">Твой план пока пуст. Добавь один небольшой шаг.</div>';
+  return tasks.map(t => `<label class="task ${t.done?'done':''}"><input class="task-check" type="checkbox" data-task="${t.id}" ${t.done?'checked':''} aria-label="${QadamI18n.t(t.done?'Вернуть в план':'Выполнить')}: ${esc(t.title)}" data-no-i18n><span class="task-body"><span class="task-title" ${starterTasks.has(t.category+':'+t.title)?'':'data-no-i18n'}>${esc(t.title)}</span><span class="task-tag">${esc(t.category)}</span></span></label>`).join('') || '<div class="empty">Твой план пока пуст. Добавь один небольшой шаг.</div>';
 }
 function progressHTML() {
   const done = state.tasks.filter(t=>t.done).length;
@@ -101,9 +111,9 @@ function plan() {
   return heading('Меньше в голове.<br>Больше ясности.','Запиши задачи и выбери, с чего начнёшь сегодня.','Мой план') + `<section class="panel"><div class="panel-title"><h2>Твои задачи</h2><span class="status">${state.tasks.filter(t=>!t.done).length} осталось</span></div><form id="taskForm" class="add-form"><input name="title" required maxlength="200" placeholder="Например, подготовить план доклада" aria-label="Новая задача"><button class="primary" type="submit">Добавить шаг</button></form>${tasksHTML()}${progressHTML()}</section>`;
 }
 function chat() {
-  return heading('Что у тебя на уме?','Здесь можно спокойно сформулировать то, что волнует.','AI-помощник') + `<div class="chat-layout"><div class="chat-notice">${icon('info')}<span>${state.ai?.cloud ? "Облачная языковая модель Google" : "Локальная языковая модель Qwen3"} ведёт диалог с учётом последних сообщений. Может ошибаться. Специалисты не отслеживают чат.</span></div>
+  return heading('Что у тебя на уме?','Здесь можно спокойно сформулировать то, что волнует.','AI-помощник') + `<div class="chat-layout"><div class="chat-notice">${icon('info')}<span>${!state.ai?.configured ? 'AI-помощник ещё не подключён на сервере. Администратору нужно настроить AI-провайдера. Остальные разделы работают.' : state.ai.cloud ? 'Облачная языковая модель Google ведёт диалог с учётом последних сообщений. Может ошибаться. Специалисты не отслеживают чат.' : 'Локальная языковая модель Qwen3 ведёт диалог с учётом последних сообщений. Может ошибаться. Специалисты не отслеживают чат.'}</span></div>
     ${state.ai?.cloud ? `<label class="consent"><input type="checkbox" id="cloudConsent" ${state.settings.ai_cloud_consent ? "checked" : ""}> Разрешаю передачу сообщений, последних реплик, задач и доступных материалов Google для ответа. Можно отозвать здесь.</label>` : ""}<div id="messages" class="messages" role="log" aria-label="Переписка с помощником">${state.messages.length ? state.messages.map(m=>`<div class="message ${m.role === 'user'?'user':'assistant'}">${m.role==='assistant'?icon('spark','assistant-icon'):''}<div class="bubble">${esc(m.text)}</div></div>`).join('') : `<div class="empty chat-empty">${icon('spark')}<h2>Можно начать с малого</h2><p>Расскажи о ситуации или выбери тему ниже.<br>Сформулируем следующий шаг вместе.</p></div>`}</div>
-    ${(state.ai_actions || []).map(a=>`<section class="panel ai-action"><h3>${esc(a.label)}</h3><p>Предложение — ожидает твоего подтверждения</p><pre>${esc(a.arguments.title || a.arguments.text || (a.arguments.task_id ? 'Задача №'+a.arguments.task_id : 'Обращение №'+a.arguments.request_id+' · '+({new:'Новое',in_progress:'В работе',resolved:'Решено'}[a.arguments.status] || '')))}</pre><button class="primary" data-ai-confirm="${esc(a.id)}">Подтвердить</button> <button class="text-button" data-ai-cancel="${esc(a.id)}">Отменить</button></section>`).join("")}<div class="chips"><button data-prompt="Помоги составить учебный план">Учебная нагрузка</button><button data-prompt="Мне тяжело справляться со стрессом">Моё состояние</button><button data-prompt="Мне сложно общаться с группой">Общение в группе</button></div>
+    ${(state.ai_actions || []).map(a=>`<section class="panel ai-action"><h3>${esc(a.label)}</h3><p>Предложение — ожидает твоего подтверждения</p><pre>${a.arguments.title || a.arguments.text ? preserveText(a.arguments.title || a.arguments.text) : esc(a.arguments.task_id ? 'Задача №'+a.arguments.task_id : 'Обращение №'+a.arguments.request_id+' · '+({new:'Новое',in_progress:'В работе',resolved:'Решено'}[a.arguments.status] || ''))}</pre><button class="primary" data-ai-confirm="${esc(a.id)}">Подтвердить</button> <button class="text-button" data-ai-cancel="${esc(a.id)}">Отменить</button></section>`).join("")}<div class="chips"><button data-prompt="Помоги составить учебный план">Учебная нагрузка</button><button data-prompt="Мне тяжело справляться со стрессом">Моё состояние</button><button data-prompt="Мне сложно общаться с группой">Общение в группе</button></div>
     <form id="chatForm" class="chat-input"><textarea name="text" required maxlength="2000" placeholder="Расскажи, что тебя волнует…" aria-label="Сообщение помощнику"></textarea><button class="primary" type="submit">Отправить</button></form><p class="fine">Enter — отправить, Shift + Enter — новая строка. Чат не является экстренной помощью.</p></div>`;
 }
 function progress() {
@@ -111,7 +121,7 @@ function progress() {
   return heading('Изменения, которые<br>стоит замечать','Без сравнений с другими. Только твой опыт и твой ритм.','Мой прогресс') + `<div class="grid"><section class="panel"><div class="panel-title"><h2>Моё состояние</h2><button class="text-button" data-checkin>Новая отметка</button></div><p class="panel-subtitle">Последние 7 записей, оценка от 1 до 5</p>
     ${recent.length ? `<div class="chart">${recent.map(c=>`<div class="chart-col"><div class="bars"><div class="bar" style="height:${c.mood*26}px" role="img" aria-label="Настроение ${c.mood} из 5" title="Настроение ${c.mood}/5"></div><div class="bar stress" style="height:${c.stress*26}px" role="img" aria-label="Стресс ${c.stress} из 5" title="Стресс ${c.stress}/5"></div></div><span>${esc(c.day.slice(5).split('-').reverse().join('.'))}</span></div>`).join('')}</div><div class="legend"><span><i></i>Настроение</span><span><i class="stress"></i>Стресс</span></div>` : '<div class="empty">История начинается с первой отметки.<br>Как ты сегодня?</div>'}<p class="fine">Отметки отражают твою самооценку и не являются психологической диагностикой.</p></section>
     <section class="panel"><h2>Маленькие победы</h2><div class="metric-big">${state.tasks.filter(t=>t.done).length}</div><p class="muted">завершённых шагов в твоём плане</p>${progressHTML()}</section></div>
-    <section class="panel section-spaced"><h2>Твои записи</h2>${[...state.checkins].reverse().map(c=>`<article class="entry"><strong>${formatDay(c.day)}</strong><small>Настроение ${c.mood}/5 · Стресс ${c.stress}/5</small><p>${esc(c.note || 'Без заметки')}</p></article>`).join('') || '<p class="muted">Здесь появятся твои отметки и заметки о дне.</p>'}</section>`;
+    <section class="panel section-spaced"><h2>Твои записи</h2>${[...state.checkins].reverse().map(c=>`<article class="entry"><strong>${formatDay(c.day)}</strong><small>Настроение ${c.mood}/5 · Стресс ${c.stress}/5</small><p>${c.note ? preserveText(c.note) : 'Без заметки'}</p></article>`).join('') || '<p class="muted">Здесь появятся твои отметки и заметки о дне.</p>'}</section>`;
 }
 function library() {
   return heading('Чуть больше ясности','Короткие материалы об учёбе, общении и заботе о себе.','Библиотека') + `<div class="chat-notice">${icon('info')}<span>Демонстрационные материалы. Перед пилотом содержание пройдёт экспертную проверку.</span></div><div class="library-grid">${articles.map((a,i)=>`<article class="panel article-card">${icon(a.icon)}<div class="eyebrow">${a.category} · ${a.time}</div><h2>${a.title}</h2><p>${a.intro}</p><button class="text-button" data-article="${i}" aria-expanded="false" aria-controls="articleContent">Читать материал</button></article>`).join('')}</div><section id="articleContent"></section>`;
@@ -119,7 +129,7 @@ function library() {
 function draftSupport() {
   return heading('Ты не один','Помощь человека — тоже часть твоего пути.','Поддержка') + `<div class="grid"><section class="panel support-panel">${icon('heart')}<h2>Сформулировать обращение</h2><p class="muted">Напиши, с чем нужна помощь. Пока это черновик: он сохранится в твоём профиле и никому не отправится.</p><form id="supportForm"><label for="supportText">Что ты хочешь обсудить?</label><textarea id="supportText" required maxlength="2000" placeholder="Например, хочу обсудить учебную нагрузку с куратором"></textarea><label class="consent"><input type="checkbox" required name="consent"><span>Я согласен сохранить текст обращения в профиле этого браузера.</span></label><button class="primary" type="submit">Сохранить черновик</button></form></section>
     <section class="panel"><h2>К кому обратиться</h2><p class="muted">Контакты специалистов добавит университет перед запуском.</p><div class="entry"><h3>Куратор</h3><p class="muted">Учебные вопросы, правила университета и организация поддержки.</p></div><div class="entry"><h3>Психолог</h3><p class="muted">Обсуждение эмоциональных трудностей с квалифицированным специалистом.</p></div><p class="fine">Если есть непосредственная угроза жизни или безопасности, обратись в местную экстренную службу. Не ожидай ответа от прототипа.</p></section></div>
-    <section class="panel section-spaced"><h2>Сохранённые черновики</h2>${[...state.support].reverse().map(s=>`<article class="entry"><small>Черновик · ${formatDay(s.day)}</small><p>${esc(s.text)}</p></article>`).join('') || '<p class="muted">Здесь появятся подготовленные обращения.</p>'}</section>`;
+    <section class="panel section-spaced"><h2>Сохранённые черновики</h2>${[...state.support].reverse().map(s=>`<article class="entry"><small>Черновик · ${formatDay(s.day)}</small><p>${preserveText(s.text)}</p></article>`).join('') || '<p class="muted">Здесь появятся подготовленные обращения.</p>'}</section>`;
 }
 function profileForm(id) {
   const fields = [['name','ФИО','text','Как к тебе обращаться'],['university','Университет','text','Название университета'],['faculty','Факультет / институт','text','Информационные технологии'],['specialty','Специальность','text','Программная инженерия'],['group','Группа','text','ПИ-101'],['course','Курс','number','1'],['phone','Телефон','tel','+7 …'],['email','Электронная почта','email','student@example.com']];
@@ -130,12 +140,17 @@ function settings() {
 }
 function accountPanel() {
   if (!state.user) return `<section class="account-note"><h3>Сохрани своё пространство</h3><p>С аккаунтом данные доступны после входа с другого устройства.</p><div class="account-actions"><button class="primary" data-auth="register" type="button">Создать аккаунт</button><button class="text-button" data-auth="login" type="button">Войти</button></div></section>`;
-  return `<section class="account-note"><strong>${esc(state.user.email)}</strong><p>${state.user.role==='curator'?'Куратор':'Студент'}</p><div class="account-actions">${state.user.role==='curator'?'<a class="text-link" href="#curator" data-profile-nav>Кабинет куратора</a>':''}<button class="text-button" type="button" data-logout>Выйти из аккаунта</button></div></section>`;
+  return `<section class="account-note"><strong>${preserveText(state.user.email)}</strong><p>${state.user.role==='curator'?'Куратор':'Студент'}</p><div class="account-actions">${state.user.role==='curator'?'<a class="text-link" href="#curator" data-profile-nav>Кабинет куратора</a>':''}<button class="text-button" type="button" data-logout>Выйти из аккаунта</button></div></section>`;
 }
 function openAuth(mode) {
+  const holder=$('#authFields');
+  if (authMode && holder.firstChild) {const fragment=document.createDocumentFragment();while(holder.firstChild)fragment.append(holder.firstChild);authDrafts.set(authMode,fragment);}
+  authMode=mode;
   const register=mode==='register';
   $('#profileDialog').close();
   if ($('#authDialog').open) $('#authDialog').close();
+  const existing=authDrafts.get(mode);
+  if (existing) {holder.append(existing);authDrafts.delete(mode);QadamI18n.localize($('#authDialog'));$('#authDialog').showModal();return;}
   $('#authFields').innerHTML=`<div class="eyebrow">Личное пространство</div><h2 id="authTitle">${register?'Создать аккаунт':'С возвращением'}</h2><form id="authForm">
     ${register?'<label for="accountName">Имя / ФИО</label><input id="accountName" name="name" required maxlength="100" autocomplete="name"><label for="accountRole">Роль</label><select id="accountRole" name="role"><option value="student">Студент</option><option value="curator">Куратор</option></select><div id="curatorRegistration" hidden><label for="campusName">Университет</label><input id="campusName" name="university" maxlength="100"><label for="campusGroup">Название группы</label><input id="campusGroup" name="group" maxlength="100" placeholder="Например, ПИ-101"></div>':''}
     <label for="accountEmail">Электронная почта</label><input id="accountEmail" name="email" type="email" required maxlength="254" autocomplete="username">
@@ -148,27 +163,28 @@ function openAuth(mode) {
   const form=$('#authForm');
   form.onsubmit=event=>{event.preventDefault();submitForm(form,async()=>{
     await api(`auth/${register?'register':'login'}`,'POST',Object.fromEntries(new FormData(form)));
-    $('#authDialog').close();await refresh();location.hash=state.user.role==='curator'?'curator':'dashboard';toast(register?'Аккаунт создан':'Ты вошёл в аккаунт');
+    $('#authDialog').close();holder.replaceChildren();authDrafts.clear();authMode=null;$('#profileFields').replaceChildren();await refresh();location.hash=state.user.role==='curator'?'curator':'dashboard';toast(register?'Аккаунт создан':'Ты вошёл в аккаунт');
   });};
+  QadamI18n.localize($('#authDialog'));
   $('#authDialog').showModal();
 }
 const requestStatuses={new:'Новое',in_progress:'В работе',resolved:'Закрыто'};
 function requestsHTML() {
-  return state.requests.length?state.requests.map(r=>`<article class="request-card"><div class="panel-title"><h3>${state.user.role==='curator'?esc(r.student_name):'Твоё обращение'}</h3><span class="status">${requestStatuses[r.status]}</span></div><small>${formatTimestamp(r.created_at)}</small><p>${esc(r.text)}</p>${r.replies.map(reply=>`<div class="request-reply"><strong>${reply.role==='curator'?'Куратор':'Студент'}</strong><p>${esc(reply.text)}</p></div>`).join('')}<form data-reply="${r.id}" class="reply-form"><label for="reply-${r.id}">Ответ</label><textarea id="reply-${r.id}" name="text" required maxlength="2000" placeholder="Напиши ответ"></textarea><button class="primary" type="submit">Отправить ответ</button></form>${state.user.role==='curator'?`<label for="status-${r.id}">Статус обращения</label><select id="status-${r.id}" data-request-status="${r.id}">${Object.entries(requestStatuses).map(([k,v])=>`<option value="${k}" ${r.status===k?'selected':''}>${v}</option>`).join('')}</select>`:''}</article>`).join(''):'<p class="muted">Обращений пока нет.</p>';
+  return state.requests.length?state.requests.map(r=>`<article class="request-card"><div class="panel-title"><h3>${state.user.role==='curator'?preserveText(r.student_name):'Твоё обращение'}</h3><span class="status">${requestStatuses[r.status]}</span></div><small>${formatTimestamp(r.created_at)}</small><p>${preserveText(r.text)}</p>${r.replies.map(reply=>`<div class="request-reply"><strong>${reply.role==='curator'?'Куратор':'Студент'}</strong><p>${preserveText(reply.text)}</p></div>`).join('')}<form data-reply="${r.id}" class="reply-form"><label for="reply-${r.id}">Ответ</label><textarea id="reply-${r.id}" name="text" required maxlength="2000" placeholder="Напиши ответ"></textarea><button class="primary" type="submit">Отправить ответ</button></form>${state.user.role==='curator'?`<label for="status-${r.id}">Статус обращения</label><select id="status-${r.id}" data-request-status="${r.id}">${Object.entries(requestStatuses).map(([k,v])=>`<option value="${k}" ${r.status===k?'selected':''}>${v}</option>`).join('')}</select>`:''}</article>`).join(''):'<p class="muted">Обращений пока нет.</p>';
 }
 function support() {
   if (!state.user) return draftSupport()+`<section class="panel section-spaced">${accountPanel()}<p class="fine">После входа можно присоединиться к группе и отправлять обращения куратору.</p></section>`;
   if (state.user.role==='curator') return heading('Обращения студентов','Отвечай на запросы и отмечай их статус.','Поддержка')+`<section class="panel">${requestsHTML()}</section>`;
   const member=state.membership;
-  return heading('Поддержка рядом','Сначала присоединись к группе по коду своего куратора.','Поддержка')+`<div class="grid"><section class="panel"><h2>${member?esc(member.name):'Присоединиться к группе'}</h2>${member?`<p class="muted">${esc(member.university)}</p><label class="consent"><input id="shareCheckins" type="checkbox" ${member.share_checkins?'checked':''}><span>Показывать куратору последнюю оценку настроения и стресса. Заметки и AI-переписка остаются личными.</span></label><button class="text-button" data-leave-group type="button">Выйти из группы</button>`:`<form id="joinGroupForm"><label for="inviteCode">Код от куратора</label><input id="inviteCode" name="code" required maxlength="30" autocomplete="off"><label class="consent"><input name="consent" type="checkbox" required><span>Разрешаю показать моё имя куратору этой группы.</span></label><label class="consent"><input name="share" type="checkbox"><span>Также показывать последние оценки настроения и стресса, без личных заметок.</span></label><button class="primary" type="submit">Присоединиться</button></form>`}</section>
+  return heading('Поддержка рядом','Сначала присоединись к группе по коду своего куратора.','Поддержка')+`<div class="grid"><section class="panel"><h2>${member?preserveText(member.name):'Присоединиться к группе'}</h2>${member?`<p class="muted">${preserveText(member.university)}</p><label class="consent"><input id="shareCheckins" type="checkbox" ${member.share_checkins?'checked':''}><span>Показывать куратору последнюю оценку настроения и стресса. Заметки и AI-переписка остаются личными.</span></label><button class="text-button" data-leave-group type="button">Выйти из группы</button>`:`<form id="joinGroupForm"><label for="inviteCode">Код от куратора</label><input id="inviteCode" name="code" required maxlength="30" autocomplete="off"><label class="consent"><input name="consent" type="checkbox" required><span>Разрешаю показать моё имя куратору этой группы.</span></label><label class="consent"><input name="share" type="checkbox"><span>Также показывать последние оценки настроения и стресса, без личных заметок.</span></label><button class="primary" type="submit">Присоединиться</button></form>`}</section>
   <section class="panel"><h2>Написать куратору</h2>${member?`<form id="sendRequestForm"><label for="requestText">Что нужно обсудить?</label><textarea id="requestText" name="text" required maxlength="2000"></textarea><label class="consent"><input name="consent" type="checkbox" required><span>Разрешаю отправить этот текст куратору моей группы.</span></label><button class="primary" type="submit">Отправить обращение</button></form>`:'<p class="muted">Форма отправки появится после присоединения к группе.</p>'}<p class="fine">Кабинет куратора не является экстренной службой. При непосредственной угрозе жизни обратись в местную экстренную службу.</p></section></div><section class="panel section-spaced"><h2>Твои обращения</h2>${requestsHTML()}</section>`;
 }
 function curator() {
   if (state.user?.role!=='curator') return heading('Кабинет куратора','Для доступа нужен аккаунт куратора.')+`<section class="panel">${accountPanel()}</section>`;
   const campus=state.campus,group=campus.group;
-  return heading('На связи со студентами','Группа, материалы университета и обращения в одном месте.','Кабинет куратора')+`<section class="day-hero"><div><div class="eyebrow">${esc(group.university)}</div><h2>${esc(group.name)}</h2><p>Передай студентам код приглашения. Они сами выбирают, какие данные показывать.</p></div><div class="invite-code"><small>Код группы</small><strong>${esc(group.invite_code)}</strong><button class="text-button" type="button" data-new-invite>Сменить код</button></div></section>
-  <div class="grid section-spaced"><section class="panel"><h2>Студенты (${campus.students.length})</h2>${campus.students.map(s=>`<article class="entry"><h3>${esc(s.name)}</h3><p class="muted">${esc(s.group)}</p><small>${s.share_checkins?(s.checkin?`Отметка ${formatDay(s.checkin.day)}: настроение ${s.checkin.mood}/5, стресс ${s.checkin.stress}/5`:'Студент ещё не оставил отметку'):'Оценки состояния скрыты студентом'}</small></article>`).join('')||'<p class="muted">Студенты появятся после вступления по коду.</p>'}<p class="fine">AI-переписка, личные заметки и контакты студентов здесь не отображаются.</p></section><section class="panel"><h2>Настройка группы</h2><form id="campusForm"><label for="groupUniversity">Университет</label><input id="groupUniversity" name="university" required maxlength="100" value="${esc(group.university)}"><label for="groupName">Название группы</label><input id="groupName" name="name" required maxlength="100" value="${esc(group.name)}"><button class="primary" type="submit">Сохранить</button></form></section></div>
-  <section class="panel section-spaced"><div class="panel-title"><h2>Обращения</h2><button type="button" class="text-button" data-refresh-campus>Обновить</button></div>${requestsHTML()}</section><section class="panel section-spaced"><h2>База знаний университета</h2><p class="muted">Добавь правила, контакты психолога или адаптационные материалы. Помощник сможет находить их в ответ на вопросы студентов твоей группы.</p><form id="resourceForm"><label for="resourceTitle">Заголовок</label><input id="resourceTitle" name="title" required maxlength="120"><label for="resourceBody">Проверенный текст</label><textarea id="resourceBody" name="body" required maxlength="4000"></textarea><p class="fine">Публикуй актуальные материалы и контакты с разрешения университета. Не добавляй личные данные студентов.</p><button class="primary" type="submit">Добавить материал</button></form>${campus.resources.map(r=>`<article class="entry"><h3>${esc(r.title)}</h3><p>${esc(r.body)}</p></article>`).join('')}</section>`;
+  return heading('На связи со студентами','Группа, материалы университета и обращения в одном месте.','Кабинет куратора')+`<section class="day-hero"><div><div class="eyebrow">${preserveText(group.university)}</div><h2>${preserveText(group.name)}</h2><p>Передай студентам код приглашения. Они сами выбирают, какие данные показывать.</p></div><div class="invite-code"><small>Код группы</small><strong>${esc(group.invite_code)}</strong><button class="text-button" type="button" data-new-invite>Сменить код</button></div></section>
+  <div class="grid section-spaced"><section class="panel"><h2>Студенты (${campus.students.length})</h2>${campus.students.map(s=>`<article class="entry"><h3>${preserveText(s.name)}</h3><p class="muted">${preserveText(s.group)}</p><small>${s.share_checkins?(s.checkin?`Отметка ${formatDay(s.checkin.day)}: настроение ${s.checkin.mood}/5, стресс ${s.checkin.stress}/5`:'Студент ещё не оставил отметку'):'Оценки состояния скрыты студентом'}</small></article>`).join('')||'<p class="muted">Студенты появятся после вступления по коду.</p>'}<p class="fine">AI-переписка, личные заметки и контакты студентов здесь не отображаются.</p></section><section class="panel"><h2>Настройка группы</h2><form id="campusForm"><label for="groupUniversity">Университет</label><input id="groupUniversity" name="university" required maxlength="100" value="${preserveText(group.university)}"><label for="groupName">Название группы</label><input id="groupName" name="name" required maxlength="100" value="${preserveText(group.name)}"><button class="primary" type="submit">Сохранить</button></form></section></div>
+  <section class="panel section-spaced"><div class="panel-title"><h2>Обращения</h2><button type="button" class="text-button" data-refresh-campus>Обновить</button></div>${requestsHTML()}</section><section class="panel section-spaced"><h2>База знаний университета</h2><p class="muted">Добавь правила, контакты психолога или адаптационные материалы. Помощник сможет находить их в ответ на вопросы студентов твоей группы.</p><form id="resourceForm"><label for="resourceTitle">Заголовок</label><input id="resourceTitle" name="title" required maxlength="120"><label for="resourceBody">Проверенный текст</label><textarea id="resourceBody" name="body" required maxlength="4000"></textarea><p class="fine">Публикуй актуальные материалы и контакты с разрешения университета. Не добавляй личные данные студентов.</p><button class="primary" type="submit">Добавить материал</button></form>${campus.resources.map(r=>`<article class="entry"><h3>${preserveText(r.title)}</h3><p>${preserveText(r.body)}</p></article>`).join('')}</section>`;
 }
 function bindCampusForms() {
   const bind=(selector,url,method,read)=>{const form=$(selector);if(form)form.onsubmit=e=>{e.preventDefault();submitForm(form,async()=>{await api(url,method,read(form));await refresh();toast('Сохранено');});};};
@@ -179,20 +195,21 @@ function bindCampusForms() {
   document.querySelectorAll('[data-reply]').forEach(form=>{form.onsubmit=e=>{e.preventDefault();submitForm(form,async()=>{await api(`requests/${form.dataset.reply}/reply`,'POST',{text:form.elements.text.value});await refresh();toast('Ответ отправлен');});};});
 }
 function formatTimestamp(value) {
-  return new Date(value.replace(' ','T')+'Z').toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+  const iso=value.replace(' ','T')+'Z';
+  return `<time data-local-timestamp="${esc(iso)}" datetime="${esc(iso)}">${new Date(iso).toLocaleString(QadamI18n.locale,{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</time>`;
 }
 function formatDay(day) {
-  return new Date(`${day}T12:00:00`).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+  return `<time data-local-date="${esc(day)}" datetime="${esc(day)}">${new Date(`${day}T12:00:00`).toLocaleDateString(QadamI18n.locale,{day:'numeric',month:'long',year:'numeric'})}</time>`;
 }
 function closeMenus() {
   $('#mainNav').classList.remove('open');
   $('#mobileMenu').setAttribute('aria-expanded','false');
-  $('#mobileMenu').ariaLabel = 'Открыть меню';
+  $('#mobileMenu').ariaLabel = t('Открыть меню');
   $('#moreNav').open = false;
 }
 function render() {
   if (!state) return;
-  document.title = `${titles[page]} — Qadam AI`;
+  document.title = `${t(titles[page])} — Qadam AI`;
   document.body.dataset.page = page;
   document.querySelectorAll('nav [data-page]').forEach(link => {
     const active = link.dataset.page === page;
@@ -204,6 +221,7 @@ function render() {
   $('#content').innerHTML = page==='home' ? home() : `<div class="app-wrap">${views[page]()}</div>`;
   if (page==='chat') $('#messages').scrollTop = $('#messages').scrollHeight;
   bindForms();
+  QadamI18n.localize();
 }
 async function navigate() {
   const next = location.hash.slice(1);
@@ -213,7 +231,7 @@ async function navigate() {
   page = target;
   closeMenus();
   render();
-  if (state.user && ['curator','support'].includes(page)) {
+  if (state?.user && ['curator','support'].includes(page)) {
     try {await refresh();} catch(error) {toast(error.message);}
   }
   window.scrollTo({top:0,behavior:'instant'});
@@ -224,7 +242,7 @@ async function submitForm(form, action) {
   form.querySelector('.form-error')?.remove();
   if (button.disabled) return;
   button.disabled = true;
-  try { await action(); } catch (error) { const note=document.createElement('p');note.className='form-error';note.setAttribute('role','alert');note.textContent=error.message;form.append(note);toast(error.message); }
+  try { await action(); } catch (error) { const note=document.createElement('p');note.className='form-error';note.setAttribute('role','alert');note.textContent=t(error.message);form.append(note);toast(error.message); }
   finally { if (button.isConnected) button.disabled=false; }
 }
 function bindProfileForm(id) {
@@ -233,7 +251,7 @@ function bindProfileForm(id) {
     event.preventDefault();
     submitForm(form,async()=>{
       await api('settings','POST',Object.fromEntries(new FormData(form)));
-      if (id==='profileModalForm') $('#profileDialog').close();
+      if (id==='profileModalForm') {$('#profileDialog').close();$('#profileFields').replaceChildren();}
       await refresh();toast('Профиль сохранён');
     });
   };
@@ -250,7 +268,7 @@ function bindForms() {
       event.preventDefault();
       const text = chatForm.elements.namedItem('text').value.trim();
       if (!text) return;
-      submitForm(chatForm,async()=>{const send=chatForm.querySelector('button');send.textContent='Думаю…';try {await api('chat','POST',{text});await refresh();$('#chatForm textarea').focus();}finally {send.textContent='Отправить';}});
+      submitForm(chatForm,async()=>{const send=chatForm.querySelector('button');send.textContent=t('Думаю…');try {await api('chat','POST',{text,language:QadamI18n.language});await refresh();$('#chatForm textarea').focus();}finally {send.textContent=t('Отправить');}});
     };
     chatForm.elements.namedItem('text').onkeydown = event => {
       if (event.key==='Enter' && !event.shiftKey && !event.isComposing) {
@@ -268,14 +286,17 @@ function bindForms() {
   };
 }
 function openCheckin() {
-  chosenMood=0;
   const today = state.today || new Date().toLocaleDateString('sv-SE');
+  if (checkinDraftDay===today) {QadamI18n.localize($('#checkinDialog'));$('#checkinDialog').showModal();return;}
+  checkinDraftDay=today;
+  chosenMood=0;
   const previous=state.checkins.find(c=>c.day===today);
   chosenMood=previous?.mood || 0;
   document.querySelectorAll('[data-mood]').forEach(b=>{const selected=Number(b.dataset.mood)===chosenMood;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});
   $('#checkinNote').value=previous?.note || '';
   $('#stress').value=previous?.stress || 3;
   $('#stressValue').value=$('#stress').value;
+  QadamI18n.localize($('#checkinDialog'));
   $('#checkinDialog').showModal();
 }
 document.addEventListener('click',async event=>{
@@ -291,7 +312,7 @@ document.addEventListener('click',async event=>{
   try {
     if (button.dataset.aiConfirm || button.dataset.aiCancel) {button.disabled=true;try {await api(`ai/actions/${button.dataset.aiConfirm || button.dataset.aiCancel}/${button.dataset.aiConfirm ? 'confirm' : 'cancel'}`,'POST',{});await refresh();}finally {button.disabled=false;}}
     if (button.dataset.auth) openAuth(button.dataset.auth);
-    if (button.hasAttribute('data-logout')) {await api('auth/logout','POST',{});$('#profileDialog').close();await refresh();location.hash='home';toast('Ты вышел из аккаунта');}
+    if (button.hasAttribute('data-logout')) {await api('auth/logout','POST',{});$('#profileDialog').close();$('#profileFields').replaceChildren();authDrafts.clear();$('#authFields').replaceChildren();authMode=null;await refresh();location.hash='home';toast('Ты вышел из аккаунта');}
     if (button.hasAttribute('data-leave-group')) {await api('membership','DELETE',{});await refresh();toast('Ты вышел из группы');}
     if (button.hasAttribute('data-new-invite')) {await api('curator/invite','POST',{});await refresh();toast('Создан новый код приглашения');}
     if (button.hasAttribute('data-refresh-campus')) {await refresh();toast('Обращения обновлены');}
@@ -307,6 +328,7 @@ document.addEventListener('click',async event=>{
       const article = articles[Number(button.dataset.article)];
       document.querySelectorAll('[data-article]').forEach(b=>b.setAttribute('aria-expanded',String(b===button)));
       $('#articleContent').innerHTML=`<article class="panel article-text"><div class="eyebrow">${article.category}</div><h2 tabindex="-1">${article.title}</h2>${article.body.split('\n\n').map(p=>`<p>${esc(p)}</p>`).join('')}</article>`;
+      QadamI18n.localize($('#articleContent'));
       $('#articleContent h2').focus({preventScroll:true});
       $('#articleContent').scrollIntoView({behavior:'smooth',block:'start'});
     }
@@ -335,7 +357,7 @@ document.addEventListener('change',async event=>{
 $('#checkinForm').onsubmit=event=>{
   event.preventDefault();
   if (!chosenMood) {toast('Выбери настроение');$('[data-mood="1"]').focus();return;}
-  submitForm($('#checkinForm'),async()=>{await api('checkins','POST',{mood:chosenMood,stress:Number($('#stress').value),note:$('#checkinNote').value});$('#checkinDialog').close();await refresh();toast('Отметка сохранена. Спасибо, что уделил себе время.');});
+  submitForm($('#checkinForm'),async()=>{await api('checkins','POST',{mood:chosenMood,stress:Number($('#stress').value),note:$('#checkinNote').value});checkinDraftDay=null;$('#checkinDialog').close();await refresh();toast('Отметка сохранена. Спасибо, что уделил себе время.');});
 };
 $('#stress').oninput=event=>$('#stressValue').value=event.target.value;
 $('#themeToggle').onclick=async()=>{
@@ -352,23 +374,33 @@ $('#themeToggle').onclick=async()=>{
 $('#mobileMenu').onclick=()=>{
   const open=$('#mainNav').classList.toggle('open');
   $('#mobileMenu').setAttribute('aria-expanded',String(open));
-  $('#mobileMenu').ariaLabel=open?'Закрыть меню':'Открыть меню';
+  $('#mobileMenu').ariaLabel=t(open?'Закрыть меню':'Открыть меню');
 };
 $('#profileButton').onclick=()=>{
   if (!state) return;
-  $('#profileFields').innerHTML=accountPanel()+profileForm('profileModalForm');
-  bindProfileForm('profileModalForm');$('#profileDialog').showModal();
+  if (!$('#profileModalForm')) {$('#profileFields').innerHTML=accountPanel()+profileForm('profileModalForm');bindProfileForm('profileModalForm');}
+  QadamI18n.localize($('#profileDialog'));$('#profileDialog').showModal();
 };
-for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('click',event=>{
-  if (event.target!==dialog) return;
-  const r=dialog.getBoundingClientRect();
-  if (event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom) dialog.close();
-});
+// Only the close button or a successful save may dismiss a form.
+for (const dialog of document.querySelectorAll('dialog')) {
+  dialog.addEventListener('cancel',event=>event.preventDefault());
+}
+
 document.addEventListener('keydown',event=>{if(event.key==='Escape') closeMenus();});
 window.addEventListener('hashchange',navigate);
 page=Object.hasOwn(titles,location.hash.slice(1))?location.hash.slice(1):'home';
 applyTheme(document.documentElement.dataset.theme);
 refresh().catch(()=>{
   $('#content').innerHTML='<div class="app-wrap"><section class="panel error-panel"><h1>Не удалось загрузить пространство</h1><p class="muted">Проверь подключение к Flask и попробуй обновить страницу.</p><button class="primary" id="retryLoad">Попробовать снова</button></section></div>';
+  QadamI18n.localize();
   $('#retryLoad').onclick=()=>location.reload();
 });
+
+$('#languageSelect').onchange=async event=>{
+  const language=event.target.value;
+  QadamI18n.set(language);
+  document.title=`${t(titles[page])} — Qadam AI`;
+  if ($('.heading-meta')) $('.heading-meta').textContent=new Date().toLocaleDateString(QadamI18n.locale,{day:'numeric',month:'long'});
+  if (state) {state.settings.language=language;try {await api('settings','POST',{language});}catch(error){toast(error.message);}}
+};
+QadamI18n.localize();
